@@ -1,0 +1,12 @@
+.DS_store
+.git
+
+.settings
+.project
+.classpath
+
+*.obj
+*.pdf
+
+bin
+lib/base
