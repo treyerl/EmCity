@@ -80,7 +80,6 @@ public class Field {
 		img.loadPixels();
 		for (int i = 0; i < img.pixels.length; i++) {
 			img.pixels[i] = P.color(255-values[i]*50, values[i]*255, 255);
-//			img.pixels[i] = P.color(255, 255, 255, values[i]);
 		}
 		img.updatePixels();
 	}

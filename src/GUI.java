@@ -110,7 +110,7 @@ public class GUI {
 				.setPosition(10, 190).setSize(15, 15).setLabel("Attract"));
 		tog.add(controlP5.addToggle(P.s5, "", "generate", P.s5.generate)
 				.setPosition(10, 350).setSize(15, 15).setLabel("Generate Volumes!"));
-		tog.add(controlP5.addToggle(P.s5, "", "show_distance", P.s5.show_distance)
+		tog.add(controlP5.addToggle(P.s5, "", "show_att_distance", P.s5.show_att_distance)
 				.setPosition(190, 100).setSize(15, 15).setLabel("Show"));
 		tog.add(controlP5.addToggle(P.s5, "", "objexport", P.s5.objexport)
 				.setPosition(80, 440).setSize(15, 15).setLabel("export OBJ"));
@@ -323,7 +323,7 @@ public class GUI {
 		P.text("Buildings 2D  [B] ", 10, P.height - 120);
 		P.text("Roads  [W] ", 10, P.height - 100);
 		P.text("Add agents!  [A] ", 10, P.height - 80);
-		P.text("Add top-down volumes![T]", 10, P.height - 60);
+		P.text("Reload Typographies![T]", 10, P.height - 60);
 		// text("Add Volume by hand [T][C][Q] ", 10, 670);
 		P.text("Save Frame JPG [F] ", 10, P.height - 40);
 		P.text("Reset simulation [R] ", 10, P.height - 20);

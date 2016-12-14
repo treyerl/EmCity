@@ -4,7 +4,7 @@ import java.util.List;
 import processing.core.PApplet;
 import processing.core.PVector;
 
-public class Cluster {
+public class Cluster implements Agent.Type, Colonizeable {
 	
 	public static Cluster create(int type) {
 		switch(type){
@@ -13,60 +13,41 @@ public class Cluster {
 		case Agent.SQUARE: return new Square();
 		default: return new Cluster();
 		}
-		
 	}
 	
-	static public class Culture extends Cluster{
+	static public class Culture extends Cluster implements Agent.Culture{
 		Culture() {
 			color = 0xff00BB00;
 		}
-		void agentInteraction(Agent agent) {
-			super.agentInteraction(agent);
-			collision = true;
-		}
 	}
-	static public class Square extends Culture{
+	static public class Square extends Cluster implements Agent.Square{
 		Square() {
 			color = 0xffA2B93A;
 		}
 	}
 	
-	public static class Private extends Cluster{
+	public static class Private extends Cluster implements Agent.Private{
 		Private() {
 			color = 0xffFFC67C;
 		}
 
 		void agentInteraction(Agent agent) {
 			super.agentInteraction(agent);
-//			if (isFull()){
-//				// attraction to culture activities
-//				agent.attraction(Agent.att_distance, Agent.att_angle, Agent.att_factor, Agent.CULTURE); 
-//				// attraction to square-park activities
-//				agent.attraction(Agent.att_distance, Agent.att_angle, Agent.att_factor, Agent.SQUARE); 
-//			}
 		}
 	}
 	
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	// FIELDS
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	List<Cell> cells;
 	PVector attractor; // centroid - use TOXI Vec3D?
 
 	int capacity;
 	int occupation;
-	int id; // not necessary (better orientation)
-	boolean id_preview = false;
 	boolean attraction;
 	int color = 0;
-	boolean collision = false;
+	int[] center = new int[2];
 
 	// TODO cluster_type = existing structure or extension
 	// TODO activity_type
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	// CONSTRUCTOR
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	Cluster() {
 		this.occupation = 0;
 		cells = new LinkedList<>();
@@ -80,11 +61,31 @@ public class Cluster {
 		return cells.size();
 	}
 	
-	public void setId(int id){
-		this.id = id;
+	public void setCenter(int x, int y){
+		center[0] = x;
+		center[1] = y;
 	}
 	
-	/** getAttraction and clusterCapacity;
+	public void setPoints(List<int[]> points, EMap map){
+		int x = center[0];
+		int y = center[1];
+		int type = getType();
+		for (int[] point : points) {
+			
+			int capacity = point[2];
+			int size = 10;
+			if (type == Agent.SQUARE){
+				capacity = 1;
+			}
+
+			Cell c = Cell.create(type, x + point[0], y + point[1], capacity, size, this); 
+			if (map.addCellIfAbsent(c)){
+				addCell(c);
+			}
+		}
+	}
+	
+	/** set Attraction and clusterCapacity;
 	 * 
 	 */
 	void init() {
@@ -105,8 +106,7 @@ public class Cluster {
 		this.attraction = true;
 
 	}
-
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	
 	void draw(PApplet p) {
 		if (attractor == null)
 			return;
@@ -119,15 +119,8 @@ public class Cluster {
 			p.popMatrix();
 
 		}
-		// Draw cluster ID
-		if (id_preview) {
-			p.textSize(10);
-			p.fill(255);
-			p.text("id: " + id, attractor.x, attractor.y, cells.get(0).capacity + 0.5f);
-		}
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	void agentInteraction(Agent agent) {
 
 		// if cluster is not fully used yet
@@ -154,14 +147,11 @@ public class Cluster {
 
 			}
 		} else {
-			// println("cluster_"+ id +": obstacle (cells of cluster are
-			// obstacles for agents)");
 			agent.collision();
 		}
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	int colonize(int colonize_by) {
+	public int colonize(int colonize_by) {
 		int rest = colonize_by;
 		for (int i = 0; i < cells.size(); i++) {
 			rest = cells.get(i).colonize(rest);
@@ -171,27 +161,23 @@ public class Cluster {
 		return rest;
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	boolean isFull() {
+	public boolean isFull() {
 		return occupation >= capacity;
 	}
 
-	////////////////////////////////////////////////////////////////////////////////////////
-	void empty() {
+	public void empty() {
 		for (int i = 0; i < cells.size(); i++) {
-			cells.get(i).resetCapacity();
+			cells.get(i).empty();
 		}
 		this.occupation = 0;
 		this.attraction = true;
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	void fill() {
-		// fill empty cells gradually (if empty add agent energy until run out
-		// of it)
+	public void fill() {
+		// fill empty cells gradually (if empty add agent energy until run out of it)
 		for (int i = 0; i < cells.size(); i++) {
 			// if cell is not full, colonize it
-			cells.get(i).fillCapacity();
+			cells.get(i).fill();
 		}
 		this.occupation = capacity;
 		this.attraction = false;
@@ -200,7 +186,4 @@ public class Cluster {
 		// if existing structure > and capacity is fulfilled > create new
 		// extended cluster
 	}
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	
 }

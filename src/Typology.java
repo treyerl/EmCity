@@ -1,29 +1,34 @@
-import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
 
 class Typology {
-	ArrayList<Integer[]> points;
+	List<int[]> points;
+	List<Cluster> usingMe = new LinkedList<>();
 	
-	Typology(ArrayList<Integer[]> points) {
-		this.points = points;
+	public Typology setPoints(List<int[]> p, EMap map) {
+		this.points = p;
+		for (Cluster cl: usingMe){
+			for (Cell cell: cl.cells) map.cells.remove(cell);
+			cl.cells.clear();
+			cl.setPoints(p, map);
+		}
+		return this;
 	}
 
 	public void createVolume(float x, float y, EMap map, int type) {
-		int a_x = (int) Math.floor(x * 0.1);
-		int a_y = (int) Math.floor(y * 0.1);
+		// round agent position (/10 + 5)
+		int a_x = (int) Math.floor(x * 0.1) * 10 + 5;
+		int a_y = (int) Math.floor(y * 0.1) * 10 + 5;
+		
 
 		if (points.size() > 0){
 			Cluster cluster = Cluster.create(type);
-			for (Integer[] point : points) {
-				// Calculate cell position from typology, round agent position (/10 + 5)
-				// HACK! cell_size
-				Cell c = Cell.create(type, a_x * 10 + 5 + point[0], a_y * 10 + 5 + point[1], point[2], 10, 
-						cluster); 
-				if (map.addCellIfAbsent(c)) 
-					cluster.addCell(c);
-			}
+			cluster.setCenter(a_x, a_y);
+			cluster.setPoints(points, map);
 			if (cluster.cellCount() > 0){
 				map.clusters.add(cluster);
 				cluster.init();
+				usingMe.add(cluster);
 			}
 		}
 	}

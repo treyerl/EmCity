@@ -1,11 +1,54 @@
 import plethora.core.Ple_Agent;
+import processing.core.PApplet;
 import toxi.geom.Vec3D;
 
 class Agent extends Ple_Agent {
 
-	public static final int PRIVATE = 0;
-	public static final int CULTURE = 1;
-	public static final int SQUARE = 2;
+	public static final int PRIVATE = 1;
+	public static final int CULTURE = 2;
+	public static final int SQUARE = 3;
+	
+	public static final int numCategories = 4;
+	
+	public interface Type {
+		default boolean is(int type){
+			return type == 0;
+		}
+		
+		default int getType(){
+			return 0;
+		}
+	}
+	
+	public interface Private extends Type{
+		default boolean is(int type){
+			return type == PRIVATE;
+		}
+		
+		default int getType(){
+			return PRIVATE;
+		}
+	}
+	
+	public interface Culture extends Type{
+		default boolean is(int type){
+			return type == CULTURE;
+		}
+		
+		default int getType(){
+			return CULTURE;
+		}
+	}
+	
+	public interface Square extends Type{
+		default boolean is(int type){
+			return type == SQUARE;
+		}
+		
+		default int getType(){
+			return SQUARE;
+		}
+	}
 	
 	public static final int[] populationSizes = new int[]{
 		10, // pop 1
@@ -29,15 +72,30 @@ class Agent extends Ple_Agent {
 		new Vec3D(1283, -482, 0)		//pop8
 	};
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	// FIELD
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
+	public static void drawPoints(PApplet p){
+		// draw initialization points for agents
+		p.ellipseMode(PApplet.CENTER);
+		p.fill(255, 132, 0, 90);// Set fill to orange
+		p.stroke(255, 100, 0); // Set stroke to deep orange
+		p.strokeWeight(3);
+		// ellipse(mouseX-width/2, mouseY-height/2, 15, 15);
+
+		/*
+		 * ellipse(-407, 37, 15, 15); ellipse(125, 225, 15, 15); ellipse(158,
+		 * -282, 15, 15); ellipse(576, 433, 15, 15); ellipse(288, 596, 15, 15);
+		 * ellipse(752, 606, 15, 15); ellipse(879, -289, 15, 15); ellipse(-304,
+		 * 474, 15, 15);
+		 */
+		for (Vec3D v: Agent.initLocations){
+			p.ellipse(v.x, v.y, 15, 15);
+		}
+	}
+	
 	int participants;
 	boolean is_active;
 	int counter;
 
 	float distance;
-	boolean add = false;
 
 	EmCity P;
 
@@ -64,11 +122,8 @@ class Agent extends Ple_Agent {
 	// ADD VOLUME
 	void addVolume(EMap map, int type) {
 		// create new cluster (cells) on agent position
-		if (counter >= P.s5.approach || P.key == 't' || P.key == 'T') {
-			map.typologies.get((int) (Math.random() * (map.typologies.size() - 1)))
-				.createVolume(this.loc.x, this.loc.y, map, type);
-		}
-
+		map.typologies.get((int) (Math.random() * (map.typologies.size() - 1)))
+			.createVolume(this.loc.x, this.loc.y, map, type);
 	}
 
 	
@@ -78,10 +133,9 @@ class Agent extends Ple_Agent {
 	 * @param attraction_factor
 	 * @param type
 	 */
-	void attraction(float max_distance, float max_angle, float attraction_factor, EMap map, int type) {
-		add = false;
-		P.map.clusters.stream().filter(c -> P.map.getClusterClass(type).isAssignableFrom(c.getClass()))
-			.forEach(c -> {
+	void attraction(float max_distance, float max_angle, float attraction_factor, EMap map) {
+
+		P.map.clusters.stream().forEach(c -> {
 			if (c.attraction){
 				Vec3D target = new Vec3D(c.attractor.x, c.attractor.y, 0);
 				Vec3D direction = target.sub(this.loc);
@@ -90,33 +144,22 @@ class Agent extends Ple_Agent {
 				distance = target.distanceTo(this.loc);
 				if (distance < max_distance && orientation_angle < max_angle) {
 					this.seek(target, (max_distance - distance) * attraction_factor);
-					if (P.s5.show_distance) {
+					if (P.s5.show_att_distance) {
+	
 						P.noStroke();
-						P.fill(0xE8C365);
+						P.fill(0xFFE8C365);
 						P.ellipse(this.loc.x, this.loc.y, distance, distance);
 					}
 				}
 
-				if (P.s5.generate) {
-//					// if (counter>=approach) { //approach distance condition
-//					switch(type){
-//					case Agent.PRIVATE:
-//						P.addVolume = true;
-//						break;
-//					case Agent.CULTURE:
-//						P.addVolume_c = true;
-//						break;
-//					case Agent.SQUARE:
-//						P.addVolume_sq = true;
-//						break;
-//					}
-					add = true;
+				if (P.s5.generate && counter >= P.s5.approach) {
+					P.addVolume[c.getType()] = true;
+					if (c.getType() != Agent.PRIVATE){
+						counter = 0;
+					}
 				}
 			}
 		});
-		if (add) {
-			addVolume(map, type);
-		}
 	}
 
 	// UPDATE NORMALIZED + INTERACT(test coming position)

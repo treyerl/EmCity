@@ -28,7 +28,9 @@
  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
  */
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.function.BiConsumer;
 
 import plethora.core.Ple_Agent;
@@ -44,73 +46,64 @@ public class EmCity extends PApplet {
 	
 	public EMap map;
 	private GUI gui;
-	private Reader reader;
+	private Reader read;
 	private Spline spline;
 	private Buildings2D buildings;
 	private Roads roads;
+	private int i = 0;
 	Settings s5;
 	
 	//GLOBAL VARIABLES
 	PImage stigIm = createImage(2400,2400,ARGB);
 	Field field = new Field(stigIm, this);
-	
-//	float fStrength=0.5f;
+
 
 	ArrayList<Ple_Agent> agents;
 	// int pop = 10; //80 agents = 10*8
-	boolean addVolume = false;
-	boolean addVolume_c = false;
-	boolean addVolume_sq = false;
+	boolean[] addVolume = new boolean[Agent.numCategories];
+	boolean[] mapdraw = new boolean[Agent.numCategories];
 	static final int cell_size_b = 10;
-	static final int cell_size_park = 12;
-	boolean showPheromone = true; // show pheromone path
+	static final int cell_size_park = 10;
 
-
-	boolean Buildings = true;
-	boolean video = false;
-	boolean mapdraw = true;
-	boolean mapdrawc = true;
-	boolean mapdrawsq = true;
+	boolean drawBuildings = true;
+	boolean saveVideo = false;
 	boolean reset_button = false;
 	boolean DRAW_ROADS = true;
 
 	int res = 0;
 	int iterT = 1;
-	
 	float distant;
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	// METHODS
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	public void setup() {
 		// fullScreen();
 		frameRate(50);
-		// size(720, 760, P3D);
-		// size(4096, 2160, P3D); //4K resolution
-		// glLoadIdentity
-		// colorMode(HSB, 255);
 		gui = new GUI(this);
+		Arrays.fill(mapdraw, true);
 		init();
 	}
 	
 	private void init(){
 		s5 = new Settings();
 		map = new EMap();
-		reader = new Reader();
-		spline = new Spline();
+		read = new Reader();
 		roads = new Roads();
+		spline = new Spline();
 		buildings = new Buildings2D();
-
-		reader.readCluster("data/clusters.txt", cell_size_b, map, Agent.PRIVATE);
-		reader.readCluster("data/culture_clusters.txt", cell_size_b, map, Agent.CULTURE);
-		reader.readCluster("data/square_clusters.txt", cell_size_park, map, Agent.SQUARE);
-		reader.readTypology("data/typologies.txt", map);
-
-		setupAgents();
-
-		if (!spline.load(reader.import_GH("data/path_following_line.txt"))){
-			System.out.println("failed on loading spline");
+		try {
+			read.cluster(read.lines("data/clusters.txt"), cell_size_b, map, Agent.PRIVATE);
+			read.cluster(read.lines("data/culture_clusters.txt"), cell_size_b, map, Agent.CULTURE);
+			read.cluster(read.lines("data/square_clusters.txt"), cell_size_park, map, Agent.SQUARE);
+			map.addTypologies(read.typologies(read.lines("data/typologies.txt"), map));
+			spline.setSpline(read.ghSpline(read.lines("data/path_following_line.txt")));
+			buildings.setSplines(read.splines(
+					read.points(read.lines("data/budovy_body.txt")), read.lines("data/budovy_zoznam.txt"), true));
+			roads.setSplines(read.splines(
+					read.points(read.lines("data/roads_body.txt")), read.lines("data/roads_index.txt"), false));
+			setupAgents();
+		} catch (IOException e){
+			e.printStackTrace();
 		}
+		
 
 		gui.initGUI();
 	}
@@ -126,11 +119,10 @@ public class EmCity extends PApplet {
 	
 	private void setupAgents(){
 		agents = new ArrayList<>();
-		
 		iteratePopulations((i,size) -> {
 			Agent agent = new Agent(this, new Vec3D(Agent.initLocations[i]));
 			agent.setVelocity(new Vec3D(random(-1, 0.5f), random(-1, 0.5f), 0));
-			// todo - the velocity can be changed and can contribute to the weights as well
+			// TODO - the velocity can be changed and can contribute to the weights as well
 			agents.add(agent);
 		});
 	}
@@ -149,24 +141,19 @@ public class EmCity extends PApplet {
 		field.getImage().loadPixels();
 
 		background(160);
-
 		strokeWeight(1);
 		noFill();
 		rect(-1645, -1508, 3291, 3016); // boundaries
 		ellipse(0, 0, 50, 50);
-		roads.drawPoints(this);
+		Agent.drawPoints(this);
 
-		if (Buildings)
-			buildings.draw(this, Buildings);
-
-		if (mapdraw) {
-			map.draw(this, Agent.PRIVATE);// draw habitation activity
+		if (drawBuildings){
+			buildings.draw(this);
 		}
-		if (mapdrawc) {
-			map.draw(this, Agent.CULTURE);// draw culture clusters - culture activity
-		}
-		if (mapdrawsq) {
-			map.draw(this, Agent.SQUARE);// draw square clusters - squares and parks
+		
+		for (int i = 1; i < Agent.numCategories ; i++){
+			// i = 0 = ALL   i = 1 = PRIVATE   i = 2 = CULTURE   i = 3 = SQUARE
+			if (mapdraw[i]) map.draw(this, i);
 		}
 
 		for (Ple_Agent pAgent : agents) {
@@ -196,9 +183,7 @@ public class EmCity extends PApplet {
 			// //agent.setMaxforce(0.05);
 
 			// attraction to clusters
-			agent.attraction(s5.att_distance, s5.att_angle, s5.att_factor, map, 0);
-			// agent.attraction_c(att_distance, att_angle, att_factor);
-			// agent.attraction_sq(att_distance, att_angle, att_factor);
+			agent.attraction(s5.att_distance, s5.att_angle, s5.att_factor, map);
 
 			// STIGMERGY
 			if (s5.stigmergy) {
@@ -257,7 +242,7 @@ public class EmCity extends PApplet {
 				Vec3D fLoc = agent.futureLoc(6);
 				// agenti behaju sem a tam po spline
 				float m = map(width, 0, width, -5, 0); 
-				Vec3D cns = agent.closestNormalandDirectionToSpline(spline.sp_path, fLoc, m);
+				Vec3D cns = agent.closestNormalandDirectionToSpline(spline.spline, fLoc, m);
 				agent.arrive(cns);
 				agent.seek(cns, s5.factor);
 			}
@@ -272,27 +257,12 @@ public class EmCity extends PApplet {
 			}
 
 			// update agents location based on agentst calculations
-			agent.interacting_update(true); // normalized velocity vector (sum
-											// of vel + acc)(no acceleration)
-
-			// Add new volume from stored typologies
-			if (addVolume) {
-				agent.addVolume(map, Agent.PRIVATE);
-				// addVolume = false;
+			// normalized velocity vector (sum of vel + acc)(no acceleration)
+			agent.interacting_update(true); 
+			
+			for (int i = 1; i < Agent.numCategories; i++){
+				if (addVolume[i]) agent.addVolume(map, i);
 			}
-
-			if (addVolume_c) {
-				agent.addVolume(map, Agent.CULTURE);
-
-				// addVolume = false;
-			}
-
-			if (addVolume_sq) {
-				agent.addVolume(map, Agent.SQUARE);
-
-				// addVolume = false;
-			}
-			// agent.update();
 
 			/*
 			 * String locList = ""; //data stored in the list - as a string
@@ -329,11 +299,12 @@ public class EmCity extends PApplet {
 		}
 		if (s5.decay < 1) field.decay(s5.decay);
 		field.getImage().updatePixels();
-		if (showPheromone) field.drawField();
+		if (s5.showPheromone) field.drawField();
 
-		addVolume = false;
-		addVolume_c = false;
-		addVolume_sq = false;
+		// reset all addVolume values to false
+		for (int i = 0; i < addVolume.length; ++i){
+			addVolume[i] = false;
+		}
 
 		/*
 		 * if(generate){
@@ -352,8 +323,8 @@ public class EmCity extends PApplet {
 		 * }
 		 */
 
-		// roads.draw();
-		spline.draw(this);// test ok
+		roads.draw(this);
+		//spline.draw(this);// test ok
 
 		if (s5.objexport) {
 			endRaw();
@@ -365,7 +336,7 @@ public class EmCity extends PApplet {
 			s5.record = !s5.record;
 		}
 		gui.gui();
-		if (video)
+		if (saveVideo)
 			saveVideoFrame();
 
 		/*
@@ -390,32 +361,52 @@ public class EmCity extends PApplet {
 		if (key == 'r' || key == 'R') {
 			reset();
 		}
-
-		if (key == 't' || key == 'T') {
-			addVolume = true;
+		
+		if (key == 't' || key == 'T'){
+			i = 0;
+			try {
+				read.lines("data/typologies.txt").forEachOrdered(s -> {
+					map.typologies.get(i++).setPoints(read.typologyPointsFromString(s), map);
+				});
+				while (map.typologies.size() > i){
+					Typology t = map.typologies.remove(i);
+					for (Cluster cl: t.usingMe){
+						for (Cell c: cl.cells){
+							map.cells.remove(EMap.xy2long(c.x, c.y));
+						}
+						map.clusters.remove(cl);
+					}
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		
+		if (key == 'i' || key == 'I') {
+			addVolume[Agent.PRIVATE] = !addVolume[Agent.PRIVATE];
 		}
 
 		if (key == 'c' || key == 'C') {
-			addVolume_c = true;
+			addVolume[Agent.CULTURE] = !addVolume[Agent.CULTURE];
 		}
 
 		if (key == 'q' || key == 'Q') {
-			addVolume_sq = true;
+			addVolume[Agent.SQUARE] = !addVolume[Agent.SQUARE];
 		}
 
 		if (key == 'v')
-			video = !video;
+			saveVideo = !saveVideo;
 		if (key == 'b')
-			Buildings = !Buildings;
+			drawBuildings = !drawBuildings;
 		if (key == '1')
-			mapdraw = !mapdraw;
+			mapdraw[1] = !mapdraw[1]; // 1 = Agent.PRIVATE
 		if (key == '2')
-			mapdrawc = !mapdrawc;
+			mapdraw[2] = !mapdraw[2]; // 2 = Agent.CULTURE
 		if (key == '3')
-			mapdrawsq = !mapdrawsq;
+			mapdraw[3] = !mapdraw[3]; // 3 = Agent.SQUARE
 
 		if (key == 'p' || key == 'P')
-			showPheromone = !showPheromone;
+			s5.showPheromone = !s5.showPheromone;
 
 		if (key == 'f' || key == 'F') {
 			saveFrame("data/simulation_model-####.jpg");
@@ -429,14 +420,11 @@ public class EmCity extends PApplet {
 			iteratePopulations((i,size)->{
 				Agent agent = new Agent(this, new Vec3D(Agent.initLocations[i]));
 				agent.setVelocity(new Vec3D(random(-1, 0.5f), random(-1, 0.5f), 0));
-				// todo - the velocity can be changed and can contribute to the  weights as well
+				// TODO - the velocity can be changed and can contribute to the  weights as well
 				agents.add(agent);
-				agent.update();
-				agent.interacting_update(true);
+//				agent.update();
+//				agent.interacting_update(true);
 			});
-
-			// agent.interacting_update(true);
-			// }
 		}
 	}
 	

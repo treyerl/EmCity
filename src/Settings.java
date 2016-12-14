@@ -7,9 +7,10 @@ public class Settings {
 			showDir = true, 
 			attract = false, 
 			generate = true, 
-			show_distance = false, 
+			show_att_distance = false, 
 			objexport = false, 
-			record = false;
+			record = false,
+			showPheromone = true; // show pheromone path
 	int approach = 100,
 		nSamples = 70; //200 - how many samples it takes (precise)
 	float 	factor = 3.5f, 

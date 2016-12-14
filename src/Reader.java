@@ -1,137 +1,151 @@
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import processing.core.PVector;
+import toxi.geom.Spline3D;
+import toxi.geom.Vec3D;
 
-class Reader implements LineReader {
-
-//	public void readClusters(String path, int cell_size, EMap map) {
-//		String txt_clusters[] = lineArray(path);
-//		if (txt_clusters == null) {
-//			System.out.println(path + " file is missing!");
-//			return;
-//		}
-//		// Get clusters from file
-//		ArrayList<Cluster> cluster_list = new ArrayList<Cluster>(txt_clusters.length);
-//		for (int i = 0; i < txt_clusters.length; i++) {
-//			String txt_cells[] = txt_clusters[i].split(" ");
-//			// Get cluster cells
-//			ArrayList<Cell> cluster_cells = new ArrayList<Cell>(txt_cells.length / 3);
-//			for (int j = 0; j < txt_cells.length - 1; j += 3) {
-//				int x = Integer.parseInt(txt_cells[j]);
-//				int y = -(Integer.parseInt(txt_cells[j + 1]));
-//				int z = Integer.parseInt(txt_cells[j + 2]);
-//				Cell cell = new Cell.Private(x, y, z, cell_size, i);
-//				cluster_cells.add(cell);
-//				map.addCell(cell);
-//
-//			}
-//			// Create cluster and store it into a list
-//			Cluster cluster = new Cluster.Private(cluster_cells, i);
-//			cluster_list.add(cluster);
-//		}
-//
-//		map.addAllClusters(cluster_list);
-//	}
-//
-//	public void readCulture_Clusters(String path, int cell_c_size, EMap map) {
-//		String txt_clusters_c[] = lineArray(path);
-//		if (txt_clusters_c == null) {
-//			System.out.println(path + " file is missing!");
-//			return;
-//		}
-//		// Get clusters from file
-//		ArrayList<Cluster> cluster_list_c = new ArrayList<>(txt_clusters_c.length);
-//		for (int i = 0; i < txt_clusters_c.length; i++) {
-//			String txt_cells_c[] = txt_clusters_c[i].split(" ");
-//
-//			// Get cluster cells
-//			ArrayList<Cell> cluster_cells_c = new ArrayList<>(txt_cells_c.length / 3);
-//			for (int j = 0; j < txt_cells_c.length - 1; j += 3) {
-//				int x = Integer.parseInt(txt_cells_c[j]);
-//				int y = -(Integer.parseInt(txt_cells_c[j + 1]));
-//				int z = Integer.parseInt(txt_cells_c[j + 2]);
-//
-//				Cell.Culture cell_c = new Cell.Culture(x, y, z, cell_c_size, i);
-//				cluster_cells_c.add(cell_c);
-//				// Register cell in map
-//				map.addCell(cell_c);
-//			}
-//			// Create cluster and store it into a list
-//			Cluster.Culture cluster_c = new Cluster.Culture(cluster_cells_c, i);
-//			cluster_list_c.add(cluster_c);
-//		}
-//		map.addAllClusters(cluster_list_c);
-//	}
-	
+class Reader{
+	private int i = 0;
+	private float c1 = 0f;
+	/**Parsing String to int
+	 * @param s
+	 * @return
+	 */
 	private int i(String s){
 		return Integer.parseInt(s);
 	}
-
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	public void readCluster(String path, int cell_size, EMap map, int type) {
-		try {
-			eachLine(path, (i,line)->{
-				Cluster cluster = Cluster.create(type);
-				String[] n = line.split(" ");
-				for (int j = 0; j < n.length - 1; j += 3) {
-					Cell c = Cell.create(type, i(n[j]), -i(n[j+1]), i(n[j+2]), cell_size, cluster);
-					cluster.addCell(c);
-					map.addCell(c);
-				}
-				map.addCluster(cluster);
-				cluster.init();
-			});
-		} catch (IOException e) {
-			System.out.printf("file %s is missing!%n", path);
+	
+	/**Parses a String to float
+	 * @param s
+	 * @return
+	 */
+	private float f(String s){
+		return Float.parseFloat(s);
+	}
+	
+	/**Create a Stream of string lines from a file path
+	 * @param path Sring
+	 * @return String&lt;String&gt;
+	 * @throws IOException
+	 */
+	public Stream<String> lines(String path) throws IOException{
+		return Files.lines(Paths.get(path));
+	}
+	
+	/**Creates a String&lt;String&gt; from a ByteBuffer holding the bytes of a "file" 
+	 * (or any other byte source)
+	 * @param bb ByteBuffer
+	 * @return String&lt;String&gt;
+	 */
+	public Stream<String> lines(ByteBuffer bb){
+		return new BufferedReader(new InputStreamReader(new ByteArrayInputStream(bb.array()))).lines();
+	}
+	
+	/**Import existing buildings; one building per line; 
+	 * consisting of a point grid that is being transformed into a cell grid.
+	 * @param lines Stream&lt;String&gt; 
+	 * @param cellSize int - the size of the cells
+	 * @param map EMap to which cells and clusters should be added
+	 * @param type int - one of the static constants defined in Agent [PRIVATE, CULTURE, SQUARE]
+	 */
+	public void cluster(Stream<String> lines, int cellSize, EMap map, int type){
+		lines.forEach(line -> {
+			Cluster cluster = Cluster.create(type);
+			String[] n = line.split(" ");
+			for (int j = 0; j < n.length - 1; j += 3) {
+				Cell c = Cell.create(type, i(n[j]), -i(n[j+1]), i(n[j+2]), cellSize, cluster);
+				cluster.addCell(c);
+				map.addCell(c);
+			}
+			map.addCluster(cluster);
+			cluster.init();
+		});
+	}
+	
+	/**read typologies from a text source
+	 * @param lines - Stream&lt;String&gt;
+	 * @return List&lt;Typology&gt; containing all Typologies
+	 */
+	public List<Typology> typologies(Stream<String> lines, EMap map){
+		return lines
+				.map(line -> new Typology().setPoints(typologyPointsFromString(line), map))
+				.collect(Collectors.toList());
+	}
+	
+	/**converts a string with whitespace separated numbers into a list of integer points (int[]{x,y,z})
+	 * @param line
+	 * @return
+	 */
+	public List<int[]> typologyPointsFromString(String line){
+		String t[] = line.split(" ");
+		int baseX = i(t[0]), baseY = i(t[1]);
+		List<int[]> p = new LinkedList<>();
+		p.add(new int[]{0,0,i(t[2])});
+		for (int i = 3; i < t.length; i+=3){
+			p.add(new int[]{baseX - i(t[i]), baseY - i(t[i+1]), i(t[i+2])});
 		}
+		return p;
+	}
+	
+	/**Read all points of a spline_body.txt file
+	 * @param pointStream Stream&lt;String&gt;
+	 * @return List&lt;Vec3D&gt;
+	 */
+	public List<Vec3D> points(Stream<String> pointStream){
+		List<Vec3D> points = new LinkedList<>();
+		i = 0;
+		pointStream.forEachOrdered(c -> {
+			if (i++ % 2 == 0){
+				c1 = f(c);
+			} else {
+				points.add(new Vec3D(c1, -f(c), 0));
+			}
+		});
+		return points;
 	}
 
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-
-	public void readTypology(String path, EMap map) {
-		String txt_typology[] = lineArray(path);
-		if (txt_typology == null) {
-			System.out.println(path + " file is missing!");
-			return;
-		}
-		// Get list of typology from file
-		ArrayList<Typology> typology_list = new ArrayList<Typology>(txt_typology.length);
-		for (int i = 0; i < txt_typology.length; i++) {
-			String txt_cells[] = txt_typology[i].split(" ");
-
-			// Get one typology cells
-			ArrayList<Integer[]> points = new ArrayList<Integer[]>(txt_cells.length / 3);
-			int base_x = 0;
-			int base_y = 0;
-			for (int j = 0; j < txt_cells.length - 1; j += 3) {
-				int x = Integer.parseInt(txt_cells[j]);
-				int y = -(Integer.parseInt(txt_cells[j + 1]));
-				int z = Integer.parseInt(txt_cells[j + 2]);
-
-				if (j == 0) {
-					base_x = x;
-					base_y = y;
-
-					points.add(new Integer[] { 0, 0, z });
-				} else {
-					points.add(new Integer[] { base_x - x, base_y - y, z });
+	/**Read all indices of a spline_index.txt file and create a List&lt;Spline3D&gt; using the List&lt;Vec3D&gt; 
+	 * @param points List&lt;Vec3D&gt; 
+	 * @param indexStream Stream&lt;String&gt;
+	 * @param close boolean that indicates whether the splines should be closed
+	 * @return List&lt;Spline3D&gt;
+	 */
+	public List<Spline3D> splines(List<Vec3D> points, Stream<String> indexStream, boolean close){
+		System.out.println(points.size());
+		Iterator<Vec3D> pit = points.iterator();
+		i = 0;
+		return indexStream.map(idx -> {
+			int end = i + i(idx);
+			Spline3D spl = new Spline3D();
+			while(i++ < end && pit.hasNext()){
+				spl.add(pit.next().copy());
+				if (i == end - 1 && close){
+					spl.add(spl.getPointList().get(0));
 				}
 			}
-			Typology typology = new Typology(points);
-			typology_list.add(typology);
-		}
-		map.addTypologies(typology_list);
+			return spl;
+		}).collect(Collectors.toList());
 	}
-
-	public PVector[] import_GH(String path) { // String_for_import_points_for_path_following_splie
-		String GH_PT[] = lineArray(path);
-		if (GH_PT != null) {
-			return Arrays.stream(GH_PT).map((s) -> s.split(" "))
-					.map(s -> new PVector(Float.parseFloat(s[0]), Float.parseFloat(s[1]))).toArray(PVector[]::new);
-		}
-		return null;
+	
+	/**
+	 * @param strstr Stream&lt;String&gt;
+	 * @return Spline3D
+	 */
+	public Spline3D ghSpline(Stream<String> strstr){
+		return new Spline3D(strstr
+				.map(s -> s.split(" "))
+				.map(s -> new Vec3D(Float.parseFloat(s[0]), Float.parseFloat(s[1]), 0))
+				.collect(Collectors.toList()));
 	}
-
+	
 }
