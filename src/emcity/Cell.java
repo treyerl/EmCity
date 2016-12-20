@@ -1,3 +1,7 @@
+package emcity;
+import java.util.LinkedList;
+import java.util.List;
+
 import processing.core.PApplet;
 
 class Cell implements Agent.Type, Colonizeable{
@@ -9,6 +13,10 @@ class Cell implements Agent.Type, Colonizeable{
 		case Agent.SQUARE: return new Square(x,y,capacity,size, c);
 		default: return new Cell(x,y,capacity, size, c);
 		}
+	}
+	
+	public static long xy2long(float x, float y){
+		return (((long) ((int)x * 0.1)) << 32) + ((int) (y * 0.1));
 	}
 	
 	static class Culture extends Cell implements Agent.Culture{
@@ -43,8 +51,12 @@ class Cell implements Agent.Type, Colonizeable{
 		this.y = y;
 		this.size = size;
 		this.capacity = capacity;
-		this.occupation = 0; // (int)random(capacity);
+		this.occupation = 0;
 		this.cluster = c;
+	}
+	
+	public long getLocationKey() {
+		return xy2long(x, y);
 	}
 	
 	void draw(PApplet p) {
@@ -93,5 +105,20 @@ class Cell implements Agent.Type, Colonizeable{
 
 	public void fill() {
 		this.occupation = capacity;
+	}
+	
+	public String toString(){
+		return "Cell: "+x+", "+y+", "+size+", "+capacity;
+	}
+	
+	public List<int[]> getFootPrint(){
+		List<int[]> fp = new LinkedList<>();
+		int s = size / 2;
+		fp.add(new int[]{x-s, y+s}); 
+		fp.add(new int[]{x+s, y+s});
+		fp.add(new int[]{x+s, y-s});
+		fp.add(new int[]{x-s, y-s});
+		fp.add(new int[]{x-s, y+s});
+		return fp;
 	}
 }

@@ -1,3 +1,4 @@
+package emcity;
 import processing.core.PApplet;
 
 /**@see DrawingSplines

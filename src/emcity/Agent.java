@@ -1,3 +1,4 @@
+package emcity;
 import plethora.core.Ple_Agent;
 import processing.core.PApplet;
 import toxi.geom.Vec3D;
@@ -115,17 +116,6 @@ class Agent extends Ple_Agent {
 		this.coming_loc = null;
 
 	}
-
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	// METHODS
-	/////////////////////////////////////////////////////////////////////////////////////////////////////
-	// ADD VOLUME
-	void addVolume(EMap map, int type) {
-		// create new cluster (cells) on agent position
-		map.typologies.get((int) (Math.random() * (map.typologies.size() - 1)))
-			.createVolume(this.loc.x, this.loc.y, map, type);
-	}
-
 	
 	/**
 	 * @param max_distance
@@ -133,9 +123,8 @@ class Agent extends Ple_Agent {
 	 * @param attraction_factor
 	 * @param type
 	 */
-	void attraction(float max_distance, float max_angle, float attraction_factor, EMap map) {
-
-		P.map.clusters.stream().forEach(c -> {
+	void attraction(float max_distance, float max_angle, float attraction_factor) {
+		P.getClusters().stream().forEach(c -> {
 			if (c.attraction){
 				Vec3D target = new Vec3D(c.attractor.x, c.attractor.y, 0);
 				Vec3D direction = target.sub(this.loc);
@@ -174,7 +163,9 @@ class Agent extends Ple_Agent {
 
 		// Test coming position
 		coming_loc = loc.add(vel);
-		P.map.interact(this, true);
+		Cell c = P.getCells().get(Cell.xy2long(coming_loc.x, coming_loc.y));
+		if (c != null) c.cluster.agentInteraction(this);
+//		P.map.interact(this, true);
 
 		if (normalized)
 			vel.normalize();

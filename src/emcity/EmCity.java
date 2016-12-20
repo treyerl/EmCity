@@ -1,3 +1,4 @@
+package emcity;
 
 /*
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -31,8 +32,15 @@
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.function.BiConsumer;
+import java.util.stream.Stream;
 
+import emcity.luci.EmCityLuciService;
 import plethora.core.Ple_Agent;
 import processing.core.PApplet;
 import processing.core.PImage;
@@ -44,7 +52,11 @@ public class EmCity extends PApplet {
 	// PUBLIC FIELD
 	/////////////////////////////////////////////////////////////////////////////////////////////////////
 	
-	public EMap map;
+	private ArrayList<Ple_Agent> agents;
+	private List<Typology> typologies;
+	private Map<Long, Cell> cells;
+	private List<Cluster> clusters;
+	
 	private GUI gui;
 	private Reader read;
 	private Spline spline;
@@ -53,19 +65,20 @@ public class EmCity extends PApplet {
 	private int i = 0;
 	Settings s5;
 	
+	private EmCityLuciService luci;
+	private Random r = new Random();
+	
 	//GLOBAL VARIABLES
 	PImage stigIm = createImage(2400,2400,ARGB);
 	Field field = new Field(stigIm, this);
-
-
-	ArrayList<Ple_Agent> agents;
 	// int pop = 10; //80 agents = 10*8
 	boolean[] addVolume = new boolean[Agent.numCategories];
-	boolean[] mapdraw = new boolean[Agent.numCategories];
+	boolean[] addVolumesForAllAgents = new boolean[Agent.numCategories];
+	boolean[] drawBuildings = new boolean[Agent.numCategories];
 	static final int cell_size_b = 10;
 	static final int cell_size_park = 10;
 
-	boolean drawBuildings = true;
+	boolean drawExistingBuildings = true;
 	boolean saveVideo = false;
 	boolean reset_button = false;
 	boolean DRAW_ROADS = true;
@@ -73,38 +86,52 @@ public class EmCity extends PApplet {
 	int res = 0;
 	int iterT = 1;
 	float distant;
+	
+	public Map<Long, Cell> getCells(){
+		return cells;
+	}
+	
+	public List<Cluster> getClusters(){
+		return clusters;
+	}
+	
+	public void setLuci(EmCityLuciService luci){
+		this.luci = luci;
+	}
 
 	public void setup() {
 		// fullScreen();
 		frameRate(50);
 		gui = new GUI(this);
-		Arrays.fill(mapdraw, true);
+		Arrays.fill(drawBuildings, true);
 		init();
+		if (luci != null) luci.createScenario(ScID -> luci.uploadClusters(clusters, null));
 	}
 	
 	private void init(){
 		s5 = new Settings();
-		map = new EMap();
 		read = new Reader();
 		roads = new Roads();
+		cells = new HashMap<>();
 		spline = new Spline();
+		clusters = new ArrayList<>();
 		buildings = new Buildings2D();
+		typologies = new ArrayList<>();
 		try {
-			read.cluster(read.lines("data/clusters.txt"), cell_size_b, map, Agent.PRIVATE);
-			read.cluster(read.lines("data/culture_clusters.txt"), cell_size_b, map, Agent.CULTURE);
-			read.cluster(read.lines("data/square_clusters.txt"), cell_size_park, map, Agent.SQUARE);
-			map.addTypologies(read.typologies(read.lines("data/typologies.txt"), map));
+			read.cluster(read.lines("data/clusters.txt"), cell_size_b, cells, clusters, Agent.PRIVATE);
+			read.cluster(read.lines("data/culture_clusters.txt"), cell_size_b, cells, clusters, Agent.CULTURE);
+			read.cluster(read.lines("data/square_clusters.txt"), cell_size_park, cells, clusters, Agent.SQUARE);
+			typologies.addAll(read.typologies(read.lines("data/typologies.txt")));
 			spline.setSpline(read.ghSpline(read.lines("data/path_following_line.txt")));
 			buildings.setSplines(read.splines(
 					read.points(read.lines("data/budovy_body.txt")), read.lines("data/budovy_zoznam.txt"), true));
 			roads.setSplines(read.splines(
 					read.points(read.lines("data/roads_body.txt")), read.lines("data/roads_index.txt"), false));
-			setupAgents();
 		} catch (IOException e){
 			e.printStackTrace();
 		}
 		
-
+		setupAgents();
 		gui.initGUI();
 	}
 	
@@ -127,6 +154,18 @@ public class EmCity extends PApplet {
 		});
 	}
 
+	private void drawCells(int type){
+		cells.values().stream()
+			.filter(c -> c.is(type))
+			.forEach(c -> c.draw(this));
+	}
+	
+	private void drawClusters(int type){
+		clusters.stream()
+			.filter(c -> c.is(type))
+			.forEach(c -> c.draw(this));
+	}
+	
 	public void draw() {
 		gui.checkOverlap();
 
@@ -147,13 +186,16 @@ public class EmCity extends PApplet {
 		ellipse(0, 0, 50, 50);
 		Agent.drawPoints(this);
 
-		if (drawBuildings){
+		if (drawExistingBuildings){
 			buildings.draw(this);
 		}
 		
 		for (int i = 1; i < Agent.numCategories ; i++){
 			// i = 0 = ALL   i = 1 = PRIVATE   i = 2 = CULTURE   i = 3 = SQUARE
-			if (mapdraw[i]) map.draw(this, i);
+			if (drawBuildings[i]) {
+				drawCells(i);
+				drawClusters(i);
+			}
 		}
 
 		for (Ple_Agent pAgent : agents) {
@@ -162,8 +204,6 @@ public class EmCity extends PApplet {
 				continue;
 			if (s5.swarmingOnOff) {
 				agent.flock(agents, 80F, 65F, 35F, s5.cohesion, s5.alignment, s5.separation); 
-				// zakladne "ozivenie" agentov podla formy prikazu v Plethore.
-				// Cisla udavaju miery hodnot viz vyssie.
 			} else {
 				agent.wander2D(5, 0, PI);
 			}
@@ -175,15 +215,8 @@ public class EmCity extends PApplet {
 			agent.bounceSpace(1575, 1710, 0);
 			agent.dropTrail(5, 2000);
 
-			// update the tail info every frame (1) agent.updateTail(1);
-			// display the tail interpolating 2 sets of values:
-			// R,G,B,ALPHA,SIZE - R,G,B,ALPHA,SIZE agent.displayTailPoints(0, 0, 0, 0, 1, 0, 0, 0, 255, 1);
-			// //set the max speed of movement:
-			// //agent.setMaxspeed(2);
-			// //agent.setMaxforce(0.05);
-
 			// attraction to clusters
-			agent.attraction(s5.att_distance, s5.att_angle, s5.att_factor, map);
+			agent.attraction(s5.att_distance, s5.att_angle, s5.att_factor);
 
 			// STIGMERGY
 			if (s5.stigmergy) {
@@ -227,9 +260,7 @@ public class EmCity extends PApplet {
 			}
 
 			if (s5.showDir) {
-
 				// calculate future location of the agent
-
 				Vec3D fLoc = agent.futureLoc(15); // future location
 				stroke(255, 0, 0, 90); // r,g,b, alpha
 				strokeWeight(1);
@@ -248,9 +279,6 @@ public class EmCity extends PApplet {
 			}
 
 			if (s5.showTrails) {
-
-				// vykreslenie chvosta ako linka - trajektoria
-
 				stroke(random(255, 0), 0, 0, 90);
 				strokeWeight(1);
 				agent.drawTrail(200);
@@ -260,29 +288,16 @@ public class EmCity extends PApplet {
 			// normalized velocity vector (sum of vel + acc)(no acceleration)
 			agent.interacting_update(true); 
 			
-			for (int i = 1; i < Agent.numCategories; i++){
-				if (addVolume[i]) agent.addVolume(map, i);
-			}
+			// FIXME: shouldn't agent.attraction() be called only here?
+			// FIXME: agent.interacting_update called twice: here and in stigmergy if-condition
 
-			/*
-			 * String locList = ""; //data stored in the list - as a string
-			 * 
-			 * 
-			 * for (int i=0; i<pop;i++){ Agent n = agents.get(i); locList=
-			 * locList+String.valueOf(-n.loc.x)+","+String.valueOf(n.loc.y)+";";
-			 * 
-			 * } //String message = agent.loc.x + "," + agent.loc.y; // the
-			 * message to send String message = locList;
-			 * 
-			 * String ip = "127.0.0.1"; // the remote IP address int port =
-			 * 7001; // the destination port print(message); udps.send( message,
-			 * ip, port );
-			 * 
-			 * 
-			 * 
-			 * // print the result //println(
-			 * "receive: \""+message+"\" from "+ip+" on port "+port );
-			 */
+			for (int i = 1; i < Agent.numCategories; i++){
+				if (addVolume[i] || addVolumesForAllAgents[i]) {
+					Cluster cl = typologies.get(r.nextInt(typologies.size()))
+							.createVolume(agent.loc.x, agent.loc.y, cells, i);
+					if (cl != null) clusters.add(cl);
+				}
+			}
 
 			// Display the location of the agent with a point
 			strokeWeight(3);// agent.participants*0.1);
@@ -292,36 +307,19 @@ public class EmCity extends PApplet {
 			// Display the direction of the agent with a line
 			strokeWeight(1);
 			stroke(100, 90);
-			// //Display the direction of the agent with a line
-			// strokeWeight(1);
-			// stroke(100, 90);
-			// agent.displayDir(agent.vel.magnitude()*3);
+			
+			for (int i = 0; i < addVolume.length; ++i){
+				addVolume[i] = false;
+			}
 		}
 		if (s5.decay < 1) field.decay(s5.decay);
 		field.getImage().updatePixels();
 		if (s5.showPheromone) field.drawField();
 
 		// reset all addVolume values to false
-		for (int i = 0; i < addVolume.length; ++i){
-			addVolume[i] = false;
+		for (int i = 0; i < addVolumesForAllAgents.length; ++i){
+			addVolumesForAllAgents[i] = false;
 		}
-
-		/*
-		 * if(generate){
-		 * 
-		 * if (frameCount==res+iterT*approach||frameCount>res+iterT*approach) {
-		 * //iteration approaching distance = based on frame_number addVolume =
-		 * true; iterT+=1; }
-		 * 
-		 * 
-		 * /* Vec3D fLoc1 = agent.futureLoc(5); distant =
-		 * fLoc.distanceTo(agent.loc);
-		 * 
-		 * if (distant>180){ //definition of real approach distance addVolume =
-		 * true; }
-		 * 
-		 * }
-		 */
 
 		roads.draw(this);
 		//spline.draw(this);// test ok
@@ -339,10 +337,6 @@ public class EmCity extends PApplet {
 		if (saveVideo)
 			saveVideoFrame();
 
-		/*
-		 * if (frameCount==4000){ reset(); }
-		 */
-
 	}
 	
 	void saveVideoFrame() {
@@ -352,10 +346,35 @@ public class EmCity extends PApplet {
 
 	void reset() {
 		frameCount = 0;
-		map.reset();
+		cells = new HashMap<Long, Cell>();
+		clusters = new LinkedList<Cluster>();
 		init();
 	}
-
+	
+	private void updateTypologies(Stream<String> lines){
+		updateTypologies(lines, new LinkedList<>());
+	}
+	
+	public List<Integer> updateTypologies(Stream<String> lines, List<Cluster> updatedClusters){
+		final List<Integer> deletedIDs = new LinkedList<>();
+		lines.forEachOrdered(s -> {
+			typologies.get(i++).setPoints(read.typologyPointsFromString(s), cells, updatedClusters);
+		});
+		while (typologies.size() > i){
+			Typology t = typologies.remove(i);
+			for (Cluster cl: t.usingMe){
+				for (Cell c: cl.cells){
+					cells.remove(c.getLocationKey());
+				}
+				clusters.remove(cl);
+				if (cl.getLuciID() != 0){
+					deletedIDs.add(cl.getLuciID());
+				}
+			}
+		}
+		return deletedIDs;
+	}
+	
 	public void keyPressed() {
 
 		if (key == 'r' || key == 'R') {
@@ -363,47 +382,35 @@ public class EmCity extends PApplet {
 		}
 		
 		if (key == 't' || key == 'T'){
-			i = 0;
 			try {
-				read.lines("data/typologies.txt").forEachOrdered(s -> {
-					map.typologies.get(i++).setPoints(read.typologyPointsFromString(s), map);
-				});
-				while (map.typologies.size() > i){
-					Typology t = map.typologies.remove(i);
-					for (Cluster cl: t.usingMe){
-						for (Cell c: cl.cells){
-							map.cells.remove(EMap.xy2long(c.x, c.y));
-						}
-						map.clusters.remove(cl);
-					}
-				}
+				updateTypologies(read.lines("data/typologies.txt"));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
 		}
 		
 		if (key == 'i' || key == 'I') {
-			addVolume[Agent.PRIVATE] = !addVolume[Agent.PRIVATE];
+			addVolumesForAllAgents[Agent.PRIVATE] = !addVolumesForAllAgents[Agent.PRIVATE];
 		}
 
 		if (key == 'c' || key == 'C') {
-			addVolume[Agent.CULTURE] = !addVolume[Agent.CULTURE];
+			addVolumesForAllAgents[Agent.CULTURE] = !addVolumesForAllAgents[Agent.CULTURE];
 		}
 
 		if (key == 'q' || key == 'Q') {
-			addVolume[Agent.SQUARE] = !addVolume[Agent.SQUARE];
+			addVolumesForAllAgents[Agent.SQUARE] = !addVolumesForAllAgents[Agent.SQUARE];
 		}
 
 		if (key == 'v')
 			saveVideo = !saveVideo;
 		if (key == 'b')
-			drawBuildings = !drawBuildings;
+			drawExistingBuildings = !drawExistingBuildings;
 		if (key == '1')
-			mapdraw[1] = !mapdraw[1]; // 1 = Agent.PRIVATE
+			drawBuildings[1] = !drawBuildings[1]; // 1 = Agent.PRIVATE
 		if (key == '2')
-			mapdraw[2] = !mapdraw[2]; // 2 = Agent.CULTURE
+			drawBuildings[2] = !drawBuildings[2]; // 2 = Agent.CULTURE
 		if (key == '3')
-			mapdraw[3] = !mapdraw[3]; // 3 = Agent.SQUARE
+			drawBuildings[3] = !drawBuildings[3]; // 3 = Agent.SQUARE
 
 		if (key == 'p' || key == 'P')
 			s5.showPheromone = !s5.showPheromone;
@@ -434,7 +441,7 @@ public class EmCity extends PApplet {
 	}
 	
 	public static void main(String _args[]) {
-		PApplet.main(new String[] { EmCity.class.getName() });
+		PApplet.runSketch(new String[]{""}, new EmCity());
 	}
 
 }

@@ -1,3 +1,4 @@
+package emcity;
 import processing.core.PApplet;
 import processing.core.PImage;
 import toxi.geom.Vec3D;

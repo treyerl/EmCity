@@ -1,3 +1,4 @@
+package emcity;
 public interface Colonizeable {
 	public boolean isFull();
 	public void empty();

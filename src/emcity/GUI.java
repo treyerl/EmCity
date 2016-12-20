@@ -1,3 +1,4 @@
+package emcity;
 import java.util.ArrayList;
 
 import controlP5.Chart;
@@ -337,13 +338,13 @@ public class GUI {
 	void area() {
 
 		// calculate built area of private activities
-		int sum_area = (int) (P.map.countCells(Agent.PRIVATE) * 100);
+		int sum_area = (int) (P.getCells().values().stream().filter(c -> c.is(Agent.PRIVATE)).count() * 100);
 
 		// calculate built area of public activities-culture
-		int sum_area_c = (int) (P.map.countCells(Agent.CULTURE) * 100);
+		int sum_area_c = (int) (P.getCells().values().stream().filter(c -> c.is(Agent.CULTURE)).count() * 100);
 
 		// calculate built area of squares/parks
-		int sum_area_sq = (int) (P.map.countCells(Agent.SQUARE) * 100);
+		int sum_area_sq = (int) (P.getCells().values().stream().filter(c -> c.is(Agent.SQUARE)).count() * 100);
 		float summ = sum_area + sum_area_c + sum_area_sq;
 		float whole = 2893599;
 

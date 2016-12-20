@@ -1,11 +1,23 @@
+package emcity;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.LinearRing;
+import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.impl.CoordinateArraySequence;
+import com.vividsolutions.jts.operation.union.CascadedPolygonUnion;
 
 import processing.core.PApplet;
 import processing.core.PVector;
 
 public class Cluster implements Agent.Type, Colonizeable {
-	
+	public final static GeometryFactory gf = new GeometryFactory();
 	public static Cluster create(int type) {
 		switch(type){
 		case Agent.PRIVATE: return new Private();
@@ -40,10 +52,12 @@ public class Cluster implements Agent.Type, Colonizeable {
 	PVector attractor; // centroid - use TOXI Vec3D?
 
 	int capacity;
+	int maxHeight = 0;
 	int occupation;
 	boolean attraction;
 	int color = 0;
 	int[] center = new int[2];
+	private int luciID = 0;
 
 	// TODO cluster_type = existing structure or extension
 	// TODO activity_type
@@ -66,20 +80,19 @@ public class Cluster implements Agent.Type, Colonizeable {
 		center[1] = y;
 	}
 	
-	public void setPoints(List<int[]> points, EMap map){
+	public void setPoints(List<int[]> points, Map<Long, Cell> allCells){
 		int x = center[0];
 		int y = center[1];
 		int type = getType();
+		cells.clear();
 		for (int[] point : points) {
-			
 			int capacity = point[2];
 			int size = 10;
 			if (type == Agent.SQUARE){
 				capacity = 1;
 			}
-
 			Cell c = Cell.create(type, x + point[0], y + point[1], capacity, size, this); 
-			if (map.addCellIfAbsent(c)){
+			if (allCells.putIfAbsent(c.getLocationKey(), c) == null){
 				addCell(c);
 			}
 		}
@@ -99,6 +112,9 @@ public class Cluster implements Agent.Type, Colonizeable {
 			sum_x += c.x;
 			sum_y += c.y;
 			capacity += c.capacity;
+			if (c.capacity > maxHeight){
+				maxHeight = c.capacity;
+			}
 		}
 
 		// centroid calculation - attraction point
@@ -119,6 +135,46 @@ public class Cluster implements Agent.Type, Colonizeable {
 			p.popMatrix();
 
 		}
+	}
+	
+	public List<List<List<double[]>>> getSurfacePolygons(){
+		List<List<List<double[]>>> faces = new LinkedList<>();
+		List<double[]> footprint = getFootprint(); //.reduceToCorners();
+		if (footprint == null) return null;
+		List<double[]> roof = footprint.stream()
+				.map(p -> new double[]{p[0], p[1], -maxHeight})
+				.collect(Collectors.toList()); 
+		faces.add(wrap(footprint));
+		for (int i = 1; i < footprint.size(); i++){
+			List<double[]> side = new LinkedList<>();
+			side.add(footprint.get(i - 1));
+			side.add(footprint.get(i));
+			side.add(roof.get(i));
+			side.add(roof.get(i - 1));
+			faces.add(wrap(side));
+		}
+		faces.add(wrap(roof));
+		return faces;
+	}
+	
+	public List<double[]> getFootprint(){
+		Geometry g = CascadedPolygonUnion.union(cells.stream()
+				.map(c -> new Polygon(new LinearRing(new CoordinateArraySequence(
+						c.getFootPrint().stream().map(i -> new Coordinate(i[0], i[1])).toArray(Coordinate[]::new)), gf), null, gf))
+				.collect(Collectors.toList()));
+		if (g.getGeometryType() == "Polygon") {
+			Polygon p = (Polygon) g;
+			return Arrays.stream(p.getExteriorRing().getCoordinates())
+					.map(c -> new double[]{c.x, c.y, 0})
+					.collect(Collectors.toList());
+		} 
+		return null;
+	}
+	
+	private List<List<double[]>> wrap(List<double[]> o){
+		List<List<double[]>> l = new LinkedList<>();
+		l.add(o);
+		return l;
 	}
 
 	void agentInteraction(Agent agent) {
@@ -185,5 +241,9 @@ public class Cluster implements Agent.Type, Colonizeable {
 		// occupancy ratio (if capcaity is full - ratio 1:1 - remove attraction)
 		// if existing structure > and capacity is fulfilled > create new
 		// extended cluster
+	}
+
+	public int getLuciID() {
+		return luciID ;
 	}
 }

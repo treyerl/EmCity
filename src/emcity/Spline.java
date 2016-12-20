@@ -1,3 +1,4 @@
+package emcity;
 import processing.core.PApplet;
 import toxi.geom.Spline3D;
 import toxi.geom.Vec3D;

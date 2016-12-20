@@ -1,3 +1,4 @@
+package emcity;
 
 public class Settings {
 	// general settings

@@ -1,3 +1,4 @@
+package emcity;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -8,13 +9,14 @@ import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import toxi.geom.Spline3D;
 import toxi.geom.Vec3D;
 
-class Reader{
+public class Reader{
 	private int i = 0;
 	private float c1 = 0f;
 	/**Parsing String to int
@@ -58,16 +60,16 @@ class Reader{
 	 * @param map EMap to which cells and clusters should be added
 	 * @param type int - one of the static constants defined in Agent [PRIVATE, CULTURE, SQUARE]
 	 */
-	public void cluster(Stream<String> lines, int cellSize, EMap map, int type){
+	void cluster(Stream<String> lines, int cellSize, Map<Long, Cell> cells, List<Cluster> clusters, int type){
 		lines.forEach(line -> {
 			Cluster cluster = Cluster.create(type);
 			String[] n = line.split(" ");
 			for (int j = 0; j < n.length - 1; j += 3) {
 				Cell c = Cell.create(type, i(n[j]), -i(n[j+1]), i(n[j+2]), cellSize, cluster);
 				cluster.addCell(c);
-				map.addCell(c);
+				cells.put(c.getLocationKey(), c);
 			}
-			map.addCluster(cluster);
+			clusters.add(cluster);
 			cluster.init();
 		});
 	}
@@ -76,9 +78,9 @@ class Reader{
 	 * @param lines - Stream&lt;String&gt;
 	 * @return List&lt;Typology&gt; containing all Typologies
 	 */
-	public List<Typology> typologies(Stream<String> lines, EMap map){
+	List<Typology> typologies(Stream<String> lines){
 		return lines
-				.map(line -> new Typology().setPoints(typologyPointsFromString(line), map))
+				.map(line -> new Typology(typologyPointsFromString(line)))
 				.collect(Collectors.toList());
 	}
 	
@@ -86,7 +88,7 @@ class Reader{
 	 * @param line
 	 * @return
 	 */
-	public List<int[]> typologyPointsFromString(String line){
+	List<int[]> typologyPointsFromString(String line){
 		String t[] = line.split(" ");
 		int baseX = i(t[0]), baseY = i(t[1]);
 		List<int[]> p = new LinkedList<>();
@@ -101,7 +103,7 @@ class Reader{
 	 * @param pointStream Stream&lt;String&gt;
 	 * @return List&lt;Vec3D&gt;
 	 */
-	public List<Vec3D> points(Stream<String> pointStream){
+	List<Vec3D> points(Stream<String> pointStream){
 		List<Vec3D> points = new LinkedList<>();
 		i = 0;
 		pointStream.forEachOrdered(c -> {
@@ -120,7 +122,7 @@ class Reader{
 	 * @param close boolean that indicates whether the splines should be closed
 	 * @return List&lt;Spline3D&gt;
 	 */
-	public List<Spline3D> splines(List<Vec3D> points, Stream<String> indexStream, boolean close){
+	List<Spline3D> splines(List<Vec3D> points, Stream<String> indexStream, boolean close){
 		System.out.println(points.size());
 		Iterator<Vec3D> pit = points.iterator();
 		i = 0;
@@ -141,7 +143,7 @@ class Reader{
 	 * @param strstr Stream&lt;String&gt;
 	 * @return Spline3D
 	 */
-	public Spline3D ghSpline(Stream<String> strstr){
+	Spline3D ghSpline(Stream<String> strstr){
 		return new Spline3D(strstr
 				.map(s -> s.split(" "))
 				.map(s -> new Vec3D(Float.parseFloat(s[0]), Float.parseFloat(s[1]), 0))
