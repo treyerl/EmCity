@@ -162,7 +162,7 @@ public class Cluster implements Agent.Type, Colonizeable {
 				.map(c -> new Polygon(new LinearRing(new CoordinateArraySequence(
 						c.getFootPrint().stream().map(i -> new Coordinate(i[0], i[1])).toArray(Coordinate[]::new)), gf), null, gf))
 				.collect(Collectors.toList()));
-		if (g.getGeometryType() == "Polygon") {
+		if (g != null && g.getGeometryType() == "Polygon") {
 			Polygon p = (Polygon) g;
 			return Arrays.stream(p.getExteriorRing().getCoordinates())
 					.map(c -> new double[]{c.x, c.y, 0})

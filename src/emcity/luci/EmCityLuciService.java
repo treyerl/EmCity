@@ -48,6 +48,7 @@ public class EmCityLuciService extends LcRemoteService {
 				JSONObject h = input.getHeader();
 				System.out.println(h);
 				AttachmentAsArray a = (AttachmentAsArray) input.getAttachment(0);
+				
 				Reader r = new Reader();
 				List<Cluster> updatedClusters = new LinkedList<>();
 				List<Integer> deletedIDs = emc.updateTypologies(r.lines(a.getByteBuffer()), updatedClusters);
@@ -115,7 +116,7 @@ public class EmCityLuciService extends LcRemoteService {
 				));
 		if (deletedIDs != null){
 			features.put(new JSONObject()
-					.put("type", "feature")
+					.put("type", "Feature")
 					.put("properties", new JSONObject().put("deletedIDs", deletedIDs)));
 		}
 		Message m = new Message(new JSONObject()
