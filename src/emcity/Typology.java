@@ -25,7 +25,7 @@ class Typology {
 	}
 	
 	public boolean setPoints(List<int[]> p, Map<Long, Cell> cells, List<Cluster> updated) {
-		if (listsOfArraysEqual(p, points)){
+		if (!listsOfArraysEqual(p, points)){
 			for (Cluster cl: usingMe){
 				for (Cell cell: cl.cells) cells.remove(cell);
 				cl.setPoints(p, cells);

@@ -259,19 +259,19 @@ public class GUI {
 	  
 		sls.add(controlP5.addSlider(P.s5, "", "pop1amount", 10, 40, 550, 10, 50, 10 )
 				.setValue(Agent.populationSizes[0]).setLabel("weights level p1"));
-		sls.add(controlP5.addSlider(P.s5, "", "pop2amount", 20, 60, 550, 30, 50, 10 )
+		sls.add(controlP5.addSlider(P.s5, "", "pop2amount", 10, 60, 550, 30, 50, 10 )
 				.setValue(Agent.populationSizes[1]).setLabel("weights level p2"));
-		sls.add(controlP5.addSlider(P.s5, "", "pop3amount", 20, 70, 550, 50, 50, 10 )
+		sls.add(controlP5.addSlider(P.s5, "", "pop3amount", 10, 70, 550, 50, 50, 10 )
 				.setValue(Agent.populationSizes[2]).setLabel("weights level p3"));
-		sls.add(controlP5.addSlider(P.s5, "", "pop4amount", 30, 80, 550, 70, 50, 10 )
+		sls.add(controlP5.addSlider(P.s5, "", "pop4amount", 10, 80, 550, 70, 50, 10 )
 				.setValue(Agent.populationSizes[3]).setLabel("weights level p4"));
-		sls.add(controlP5.addSlider(P.s5, "", "pop5amount", 30, 90, 550, 90, 50, 10 )
+		sls.add(controlP5.addSlider(P.s5, "", "pop5amount", 10, 90, 550, 90, 50, 10 )
 				.setValue(Agent.populationSizes[4]).setLabel("weights level p5"));
-		sls.add(controlP5.addSlider(P.s5, "", "pop6amount", 40, 100, 550, 110, 50, 10)
+		sls.add(controlP5.addSlider(P.s5, "", "pop6amount", 10, 100, 550, 110, 50, 10)
 				.setValue(Agent.populationSizes[5]).setLabel("weights level p6"));
-		sls.add(controlP5.addSlider(P.s5, "", "pop7amount", 40, 100, 550, 130, 50, 10 )
+		sls.add(controlP5.addSlider(P.s5, "", "pop7amount", 10, 100, 550, 130, 50, 10 )
 				.setValue(Agent.populationSizes[6]).setLabel("weights level p7"));
-		sls.add(controlP5.addSlider(P.s5, "", "pop8amount", 50, 100, 550, 150, 50, 10 )
+		sls.add(controlP5.addSlider(P.s5, "", "pop8amount", 10, 100, 550, 150, 50, 10 )
 				.setValue(Agent.populationSizes[7]).setLabel("weights level p8"));
 	
 		//menu group

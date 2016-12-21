@@ -121,7 +121,7 @@ public class EmCity extends PApplet {
 			read.cluster(read.lines("data/clusters.txt"), cell_size_b, cells, clusters, Agent.PRIVATE);
 			read.cluster(read.lines("data/culture_clusters.txt"), cell_size_b, cells, clusters, Agent.CULTURE);
 			read.cluster(read.lines("data/square_clusters.txt"), cell_size_park, cells, clusters, Agent.SQUARE);
-			typologies.addAll(read.typologies(read.lines("data/typologies.txt")));
+			typologies.addAll(read.typologies(read.lines("data/typologies_test.txt")));
 			spline.setSpline(read.ghSpline(read.lines("data/path_following_line.txt")));
 			buildings.setSplines(read.splines(
 					read.points(read.lines("data/budovy_body.txt")), read.lines("data/budovy_zoznam.txt"), true));
@@ -217,6 +217,23 @@ public class EmCity extends PApplet {
 
 			// attraction to clusters
 			agent.attraction(s5.att_distance, s5.att_angle, s5.att_factor);
+			
+			//hack concerning the Tanjong Pagar site.
+			//avoiding the roads as obstacles using the addForce function from Plethora library
+			//changing the direction of agents
+			//let's force the agents to stay within the borders of waterfront and an island
+			//using this function, the agents no longer occupying CBD
+			Vec3D fLoc_ob = agent.futureLoc(5);	
+			float m_ob = map(width, 0, width, -5, 0); 
+			Vec3D cns_ob = agent.closestNormalandDirectionToSpline(spline.spline, fLoc_ob, m_ob);	
+			float obstacle_distance = cns_ob.distanceTo(fLoc_ob);
+			float maxForce = (float) 1.2;
+
+			if (obstacle_distance > 0 && obstacle_distance < 5) { // distance
+				agent.setMaxforce(maxForce); // can be changed later on
+				agent.addForce(-agent.loc.x, -agent.loc.y, agent.loc.z);
+
+			}
 
 			// STIGMERGY
 			if (s5.stigmergy) {
@@ -243,7 +260,7 @@ public class EmCity extends PApplet {
 				}
 				// stigmergic vector with scale
 				Vec3D stigVec = bestLoc.sub(agent.loc).normalize().scale(s5.stigmergyStrength);
-				agent.vel.addSelf(stigVec);// orient agent by stigmegic vector
+				agent.vel.addSelf(stigVec);// orient agent by stigmergic vector
 											// (add velocity)
 				agent.vel.normalize();// to do a constant speed
 
@@ -276,6 +293,8 @@ public class EmCity extends PApplet {
 				Vec3D cns = agent.closestNormalandDirectionToSpline(spline.spline, fLoc, m);
 				agent.arrive(cns);
 				agent.seek(cns, s5.factor);
+				
+
 			}
 
 			if (s5.showTrails) {
@@ -357,8 +376,11 @@ public class EmCity extends PApplet {
 	
 	public List<Integer> updateTypologies(Stream<String> lines, List<Cluster> updatedClusters){
 		final List<Integer> deletedIDs = new LinkedList<>();
+		i=0;
 		lines.forEachOrdered(s -> {
-			typologies.get(i++).setPoints(read.typologyPointsFromString(s), cells, updatedClusters);
+			if (i<typologies.size())
+				typologies.get(i++).setPoints(read.typologyPointsFromString(s), cells, updatedClusters);
+			else typologies.add(new Typology(read.typologyPointsFromString(s)));
 		});
 		while (typologies.size() > i){
 			Typology t = typologies.remove(i);
@@ -383,7 +405,7 @@ public class EmCity extends PApplet {
 		
 		if (key == 't' || key == 'T'){
 			try {
-				updateTypologies(read.lines("data/typologies.txt"));
+				updateTypologies(read.lines("data/typologies_test.txt"));
 			} catch (IOException e) {
 				e.printStackTrace();
 			}

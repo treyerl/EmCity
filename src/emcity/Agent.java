@@ -53,24 +53,24 @@ class Agent extends Ple_Agent {
 	
 	public static final int[] populationSizes = new int[]{
 		10, // pop 1
-		20, // pop 2
-		25, // pop 3
-		30, // pop 4
-		30, // pop 5
-		40, // pop 6
-		45, // pop 7
-		50  // pop 8
+		16, // pop 2
+		18, // pop 3
+		18, // pop 4
+		15, // pop 5
+		10, // pop 6
+		12, // pop 7
+		14  // pop 8
 	};
 	
 	public static final Vec3D[] initLocations = new Vec3D[]{
-		new Vec3D(-987, -180.95f, 0),	//pop1
-		new Vec3D(1381, 0, 0),			//pop2
-		new Vec3D(158, 845, 0),			//pop3
-		new Vec3D(576, -332, 0),		//pop4
-		new Vec3D(-1020, 596, 0),		//pop5
-		new Vec3D(460, 392, 0),			//pop6
-		new Vec3D(-131, -289, 0),		//pop7
-		new Vec3D(1283, -482, 0)		//pop8
+			new Vec3D(-1019, -180.95f, 0),	//pop1
+			new Vec3D(1414, -60, 0),		//pop2
+			new Vec3D(131, 844, 0),			//pop3
+			new Vec3D(-230, -452, 0),		//pop4
+			new Vec3D(-1085, 754, 0),		//pop5
+			new Vec3D(-460, 452, 0),			//pop6
+			new Vec3D(1381, -663, 0),		//pop7
+			new Vec3D(954, -482, 0)		//pop8
 	};
 
 	public static void drawPoints(PApplet p){
@@ -143,9 +143,7 @@ class Agent extends Ple_Agent {
 
 				if (P.s5.generate && counter >= P.s5.approach) {
 					P.addVolume[c.getType()] = true;
-					if (c.getType() != Agent.PRIVATE){
-						counter = 0;
-					}
+
 				}
 			}
 		});

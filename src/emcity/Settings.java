@@ -6,24 +6,25 @@ public class Settings {
 			showTrails = true, 
 			stigmergy = true, 
 			showDir = true, 
-			attract = false, 
-			generate = true, 
+			attract = true, 
+			generate = false, 
 			show_att_distance = false, 
 			objexport = false, 
 			record = false,
 			showPheromone = true; // show pheromone path
 	int approach = 100,
 		nSamples = 70; //200 - how many samples it takes (precise)
-	float 	factor = 3.5f, 
+	float 	factor = 0.05f, 
 			scatter = 10,  // stigmergy influence raduis
 			decay = 1.5f, 
 			att_distance = 100f,
 			att_angle = 1.4f,
 			att_factor = 0.1f, 
 			stigmergyStrength = 0.8f, 
-			cohesion = 1.5f, 
-			alignment = 0.5f, 
+			cohesion = 0f, 
+			alignment = 1.5f, 
 			separation = 1.5f;
+
 	
 	// Populations
 	int pop_1, pop_2, pop_3, pop_4, pop_5, pop_6, pop_7, pop_8;
