@@ -246,4 +246,8 @@ public class Cluster implements Agent.Type, Colonizeable {
 	public int getLuciID() {
 		return luciID ;
 	}
+	
+	public void setLuciID(int id){
+		luciID = id;
+	}
 }

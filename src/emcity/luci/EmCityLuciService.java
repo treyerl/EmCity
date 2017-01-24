@@ -2,6 +2,8 @@ package emcity.luci;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -12,13 +14,18 @@ import emcity.Cluster;
 import emcity.EmCity;
 import emcity.Reader;
 import luci.connect.AttachmentAsArray;
+import luci.connect.JSON;
 import luci.connect.LcRemoteService;
 import luci.connect.Message;
+import peasy.PeasyCam;
 import processing.core.PApplet;
 
 public class EmCityLuciService extends LcRemoteService {
-	private int ScID = 0;
+	public final String scenarioName = "EmCity"; 
+	private int ScID = 0, cameraID;
+	boolean didReceiveCameraID = false;
 	private EmCity emc;
+	private LinkedList<List<Cluster>> updatedClusters = new LinkedList<>();
 	public EmCityLuciService(DefaultArgsProcessor ap) {
 		super(ap);
 	}
@@ -39,7 +46,20 @@ public class EmCityLuciService extends LcRemoteService {
 			
 			@Override
 			public void processResult(Message m) {
-				// TODO Auto-generated method stub
+				if (updatedClusters.size() > 0){
+					List<Cluster> clusters = updatedClusters.removeFirst();
+					List<Integer> newIDs = JSON.ArrayToIntList(m.getHeader()
+							.getJSONObject("result").getJSONArray("newIDs"));
+					for (int i = 0; i < newIDs.size(); i++){
+						clusters.get(i).setLuciID(newIDs.get(i));
+					}
+				} else {
+//					System.out.println(m);
+				}
+			}
+			
+			@Override
+			public void processProgress(Message m){
 				
 			}
 			
@@ -89,16 +109,52 @@ public class EmCityLuciService extends LcRemoteService {
     }
 	
 	public void createScenario(Consumer<Integer> onScenarioCreated){
-		JSONObject request = new JSONObject().put("run", "scenario.Create").put("name", "EmCity");
+		sendAndReceive(
+				new Message(new JSONObject().put("run", "scenario.GetList")), 
+				new ResponseHandler(){
+			@Override
+			public void processResult(Message m) {
+				JSONObject r = m.getHeader().getJSONObject("result");
+				List<Integer> ScIDs = StreamSupport.stream(r.getJSONArray("scenarios").spliterator(), false)
+						.filter(o -> ((JSONObject) o).getString("name").equals(scenarioName))
+						.map(o -> ((JSONObject) o).getInt("ScID"))
+						.collect(Collectors.toList());
+				if (ScIDs.size() > 0){
+					System.out.printf("deleting %d", ScID);
+					sendAndReceive(
+						new Message(new JSONObject()
+							.put("run", "scenario.Delete")
+							.put("ScIDs", ScIDs)
+						),
+						new ResponseHandler() {
+							@Override
+							public void processResult(Message m) {
+								_createScenario(onScenarioCreated);
+							}
+							public void processError(Message m) {
+								System.err.println(m.getHeader().getString("error"));
+								_createScenario(onScenarioCreated);
+							}
+						}
+					);
+				} else _createScenario(onScenarioCreated);
+			}
+			public void processProgress(Message m){/*not even print in log level `trace`*/}
+		});
+	}
+	
+	private void _createScenario(Consumer<Integer> onScenarioCreated){
+		JSONObject request = new JSONObject()
+				.put("run", "scenario.Create")
+				.put("name", scenarioName);
 		sendAndReceive(new Message(request), new ResponseHandler(){
-
 			@Override
 			public void processResult(Message m) {
 				JSONObject h = m.getHeader();
 				ScID = h.getJSONObject("result").getInt("ScID");
 				onScenarioCreated.accept(ScID);
 			}
-			
+			public void processProgress(Message m){/*not even print in log level `trace`*/}
 		});
 	}
 
@@ -126,11 +182,71 @@ public class EmCityLuciService extends LcRemoteService {
 						.put("format", "geojson")
 						.put("geometry", geojson))
 				);
-//		for (Object f: features){
-//			JSONObject o = (JSONObject) f;
-//			System.out.println(o.toString(4));
-//		}
+		updatedClusters.add(clusters);
 		send(m);
+	}
+	
+	public void publishCamera(PeasyCam cam){
+		JSONObject jCam = peasyCamToJSONObject(cam);
+		if (!didReceiveCameraID){
+			sendAndReceive(new Message(new JSONObject().put("run", "scenario.camera.List")), 
+				new ResponseHandler() {
+				@Override
+				public void processResult(Message m) {
+					List<Integer> ids = JSON.ArrayToIntList(m.getHeader().getJSONObject("result")
+							.getJSONArray("cameraIDs"));
+					if (ids.size() > 0){
+						cameraID = ids.get(0);
+						didReceiveCameraID = true;
+						send(new Message(jCam
+								.put("run", "scenario.camera.Update")
+								.put("cameraID", cameraID)));
+					} else {
+						sendAndReceive(new Message(jCam
+								.put("run", "scenario.camera.Create")
+								.put("scale", 1)),
+								new ResponseHandler() {
+									@Override
+									public void processResult(Message m) {
+										cameraID = m.getHeader().getJSONObject("result").getInt("cameraID");
+									}
+									public void processProgress(Message m){/*not even print in log level `trace`*/}
+								});
+					}
+					
+				}
+				public void processProgress(Message m){/*not even print in log level `trace`*/}
+			});
+		} else {
+			send(new Message(jCam
+					.put("run", "scenario.camera.Update")
+					.put("cameraID", cameraID)));
+		}
+	}
+	
+	public JSONObject peasyCamToJSONObject(PeasyCam cam){
+		return new JSONObject()
+				.put("lookAt", new JSONObject()
+						.put("x", f(-cam.getLookAt()[0]))
+						.put("y", f(-cam.getLookAt()[2]))
+						.put("z", f(-cam.getLookAt()[1])))
+				.put("cameraUp", new JSONObject()
+						.put("x", f(-cam.getRotations()[0]))
+						.put("y", f(-cam.getRotations()[2]))
+						.put("z", f(-cam.getRotations()[1]))
+//						.put("x", 0)
+//						.put("y", 1)
+//						.put("z", 0)
+						)
+				.put("location", new JSONObject()
+						.put("x", f(-cam.getPosition()[0]))
+						.put("y", f(-cam.getPosition()[2]))
+						.put("z", f(-cam.getPosition()[1])));
+	}
+	
+	private float f(float f){
+		if (f == -0) return 0.0f;
+		return f;
 	}
 
 }

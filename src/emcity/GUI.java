@@ -32,6 +32,10 @@ public class GUI {
 		p3d = (PGraphics3D) P.g;
 		campeasy = new PeasyCam(P, 3200);
 	}
+	
+	public PeasyCam getCam(){
+		return campeasy;
+	}
 
 	public void initGUI() {
 		

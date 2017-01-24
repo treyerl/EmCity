@@ -101,11 +101,17 @@ public class EmCity extends PApplet {
 
 	public void setup() {
 		// fullScreen();
-		frameRate(50);
+		frameRate(5);
 		gui = new GUI(this);
 		Arrays.fill(drawBuildings, true);
 		init();
-		if (luci != null) luci.createScenario(ScID -> luci.uploadClusters(clusters, null));
+		if (luci != null)
+			if (luci.isConnected())
+				luci.createScenario(ScID -> luci.uploadClusters(clusters, null));
+			else {
+				System.err.println("not connected to Luci!");
+				System.exit(0);
+			}
 	}
 	
 	private void init(){
@@ -197,7 +203,8 @@ public class EmCity extends PApplet {
 				drawClusters(i);
 			}
 		}
-
+		
+		List<Cluster> newVolumes = new ArrayList<>();
 		for (Ple_Agent pAgent : agents) {
 			Agent agent = (Agent) pAgent;
 			if (!agent.is_active)
@@ -293,8 +300,6 @@ public class EmCity extends PApplet {
 				Vec3D cns = agent.closestNormalandDirectionToSpline(spline.spline, fLoc, m);
 				agent.arrive(cns);
 				agent.seek(cns, s5.factor);
-				
-
 			}
 
 			if (s5.showTrails) {
@@ -314,7 +319,10 @@ public class EmCity extends PApplet {
 				if (addVolume[i] || addVolumesForAllAgents[i]) {
 					Cluster cl = typologies.get(r.nextInt(typologies.size()))
 							.createVolume(agent.loc.x, agent.loc.y, cells, i);
-					if (cl != null) clusters.add(cl);
+					if (cl != null) {
+						clusters.add(cl);
+						newVolumes.add(cl);
+					}
 				}
 			}
 
@@ -355,6 +363,14 @@ public class EmCity extends PApplet {
 		gui.gui();
 		if (saveVideo)
 			saveVideoFrame();
+		
+		if (luci != null){
+			if (newVolumes.size() > 0){
+				luci.uploadClusters(newVolumes, null);
+			}
+			luci.publishCamera(gui.getCam());
+		}
+			
 
 	}
 	
@@ -459,7 +475,7 @@ public class EmCity extends PApplet {
 	
 	public void settings() {
 		smooth();
-		size(1200, 800, P3D);
+		size(900, 600, P3D);
 	}
 	
 	public static void main(String _args[]) {
