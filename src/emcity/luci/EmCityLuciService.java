@@ -1,4 +1,6 @@
 package emcity.luci;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -18,14 +20,16 @@ import luci.connect.JSON;
 import luci.connect.LcRemoteService;
 import luci.connect.Message;
 import peasy.PeasyCam;
+import peasy.org.apache.commons.math.geometry.Rotation;
+import peasy.org.apache.commons.math.geometry.Vector3D;
 import processing.core.PApplet;
+import processing.core.PMatrix;
 
 public class EmCityLuciService extends LcRemoteService {
 	public final String scenarioName = "EmCity"; 
 	private int ScID = 0, cameraID;
 	boolean didReceiveCameraID = false;
 	private EmCity emc;
-	private LinkedList<List<Cluster>> updatedClusters = new LinkedList<>();
 	public EmCityLuciService(DefaultArgsProcessor ap) {
 		super(ap);
 	}
@@ -46,21 +50,7 @@ public class EmCityLuciService extends LcRemoteService {
 			
 			@Override
 			public void processResult(Message m) {
-				if (updatedClusters.size() > 0){
-					List<Cluster> clusters = updatedClusters.removeFirst();
-					List<Integer> newIDs = JSON.ArrayToIntList(m.getHeader()
-							.getJSONObject("result").getJSONArray("newIDs"));
-					for (int i = 0; i < newIDs.size(); i++){
-						clusters.get(i).setLuciID(newIDs.get(i));
-					}
-				} else {
-//					System.out.println(m);
-				}
-			}
-			
-			@Override
-			public void processProgress(Message m){
-				
+//				System.out.println(m);
 			}
 			
 			@Override
@@ -139,7 +129,6 @@ public class EmCityLuciService extends LcRemoteService {
 					);
 				} else _createScenario(onScenarioCreated);
 			}
-			public void processProgress(Message m){/*not even print in log level `trace`*/}
 		});
 	}
 	
@@ -154,10 +143,13 @@ public class EmCityLuciService extends LcRemoteService {
 				ScID = h.getJSONObject("result").getInt("ScID");
 				onScenarioCreated.accept(ScID);
 			}
-			public void processProgress(Message m){/*not even print in log level `trace`*/}
 		});
 	}
 
+	/**Generates GeoJSON geometry
+	 * @param clusters
+	 * @param deletedIDs
+	 */
 	public void uploadClusters(List<Cluster> clusters, List<Integer> deletedIDs) {
 		final JSONArray features = new JSONArray();
 		final JSONObject geojson = new JSONObject()
@@ -182,8 +174,16 @@ public class EmCityLuciService extends LcRemoteService {
 						.put("format", "geojson")
 						.put("geometry", geojson))
 				);
-		updatedClusters.add(clusters);
-		send(m);
+		sendAndReceive(m, new ResponseHandler() {
+			@Override
+			public void processResult(Message m) {
+				List<Integer> newIDs = JSON.ArrayToIntList(m.getHeader()
+						.getJSONObject("result").getJSONArray("newIDs"));
+				for (int i = 0; i < newIDs.size(); i++){
+					clusters.get(i).setLuciID(newIDs.get(i));
+				}
+			}
+		});
 	}
 	
 	public void publishCamera(PeasyCam cam){
@@ -210,12 +210,10 @@ public class EmCityLuciService extends LcRemoteService {
 									public void processResult(Message m) {
 										cameraID = m.getHeader().getJSONObject("result").getInt("cameraID");
 									}
-									public void processProgress(Message m){/*not even print in log level `trace`*/}
 								});
 					}
 					
 				}
-				public void processProgress(Message m){/*not even print in log level `trace`*/}
 			});
 		} else {
 			send(new Message(jCam
@@ -225,28 +223,71 @@ public class EmCityLuciService extends LcRemoteService {
 	}
 	
 	public JSONObject peasyCamToJSONObject(PeasyCam cam){
+		System.out.println(Arrays.toString(cam.getRotations()));
+		System.out.println(Arrays.toString(emc.getMatrix().get(null)));
+//		float[] r = cam.getRotations();
+//		Rotation rotX = new Rotation(new Vector3D(1,0,0), r[0]);
+//		Rotation rotY = new Rotation(new Vector3D(0,1,0), r[1]);
+//		Rotation rotZ = new Rotation(new Vector3D(0,0,1), r[2]);
+//		Rotation rot = rotX.applyTo(rotY).applyTo(rotZ);
+//		Vector3D camUp = rot.applyTo(new Vector3D(0,-1,0));
+		
+		PMatrix m = emc.getMatrix();
+		float[] camUp = new float[4];
+		PMatrix cm = m.get();
+		cm.invert();
+		cm.mult(new float[]{0, 1, 0, 0}, camUp);
+		
+//		Vector3D camUp = cam.getRotation().applyTo(new Vector3D(0,1,0));
+		
+//		List<Float> rotX = Arrays.asList(new Float[]{
+//					1f, 0f, 0f,
+//					0f, (float) Math.cos(r[0]), (float) -Math.sin(r[0]),
+//					0f, (float) Math.sin(r[0]), (float) Math.cos(r[0])
+//		});
+//		List<Float> rotY = Arrays.asList(new Float[]{
+//					(float) Math.cos(r[1]), 0f, (float) Math.sin(r[1]),
+//					0f, 1f, 0f,
+//					(float) -Math.sin(r[0]), 0f, (float) Math.cos(r[0])
+//		});
+//		List<Float> rotZ = Arrays.asList(new Float[]{
+//					(float) Math.cos(r[0]), (float) -Math.sin(r[0]), 0f,
+//					(float) Math.sin(r[0]), (float) Math.cos(r[0]), 0f,
+//					0f, 0f, 1f
+//		});
+		
+		
+		
 		return new JSONObject()
 				.put("lookAt", new JSONObject()
-						.put("x", f(-cam.getLookAt()[0]))
-						.put("y", f(-cam.getLookAt()[2]))
-						.put("z", f(-cam.getLookAt()[1])))
+						.put("x",  f(cam.getLookAt()[0]))
+						.put("y", f(cam.getLookAt()[1]))
+						.put("z",  f(cam.getLookAt()[2])))
 				.put("cameraUp", new JSONObject()
-						.put("x", f(-cam.getRotations()[0]))
-						.put("y", f(-cam.getRotations()[2]))
-						.put("z", f(-cam.getRotations()[1]))
+//						.put("x",  f(camUp.getX()))
+//						.put("y",  f(camUp.getY()))
+//						.put("z",  f(camUp.getZ()))
+						.put("x",  f(camUp[0]))
+						.put("y",  f(camUp[1]))
+						.put("z",  f(camUp[2]))
 //						.put("x", 0)
 //						.put("y", 1)
 //						.put("z", 0)
 						)
 				.put("location", new JSONObject()
-						.put("x", f(-cam.getPosition()[0]))
-						.put("y", f(-cam.getPosition()[2]))
-						.put("z", f(-cam.getPosition()[1])));
+						.put("x",  f(cam.getPosition()[0]))
+						.put("y", f(-cam.getPosition()[1]))
+						.put("z",  f(cam.getPosition()[2])));
 	}
 	
 	private float f(float f){
 		if (f == -0) return 0.0f;
 		return f;
+	}
+	
+	private float f(double f){
+		if (f == -0) return 0.0f;
+		return (float)f;
 	}
 
 }

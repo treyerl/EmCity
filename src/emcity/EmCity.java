@@ -414,6 +414,11 @@ public class EmCity extends PApplet {
 	}
 	
 	public void keyPressed() {
+		if (keyCode == 37) gui.getCam().rotateY(-0.1);
+		if (keyCode == 39) gui.getCam().rotateY(0.1);
+		
+		if (keyCode == 38) gui.getCam().rotateX(-0.1);
+		if (keyCode == 40) gui.getCam().rotateX(0.1);
 
 		if (key == 'r' || key == 'R') {
 			reset();

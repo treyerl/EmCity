@@ -137,12 +137,16 @@ public class Cluster implements Agent.Type, Colonizeable {
 		}
 	}
 	
+	/**IMPORTANT: Y coordinates inverted because of Processing having 0,0 
+	 * at top left corner
+	 * @return
+	 */
 	public List<List<List<double[]>>> getSurfacePolygons(){
 		List<List<List<double[]>>> faces = new LinkedList<>();
 		List<double[]> footprint = getFootprint(); //.reduceToCorners();
 		if (footprint == null) return null;
 		List<double[]> roof = footprint.stream()
-				.map(p -> new double[]{p[0], p[1], -maxHeight})
+				.map(p -> new double[]{p[0], p[1], maxHeight})
 				.collect(Collectors.toList()); 
 		faces.add(wrap(footprint));
 		for (int i = 1; i < footprint.size(); i++){
@@ -157,11 +161,16 @@ public class Cluster implements Agent.Type, Colonizeable {
 		return faces;
 	}
 	
+	/**Using JTS to unify the cell's footprints to a cluster footprint.
+	 * IMPORTANT: invert Y coordinates due to processing having 0,0 at the top left corner.
+	 * @return
+	 */
 	public List<double[]> getFootprint(){
 		Geometry g = CascadedPolygonUnion.union(cells.stream()
 				.map(c -> new Polygon(new LinearRing(new CoordinateArraySequence(
-						c.getFootPrint().stream().map(i -> new Coordinate(i[0], i[1])).toArray(Coordinate[]::new)), gf), null, gf))
-				.collect(Collectors.toList()));
+						c.getFootPrint().stream().map(i -> new Coordinate(i[0], -i[1])).toArray(Coordinate[]::new)), gf), null, gf))
+				.collect(Collectors.toList()))
+				.reverse();
 		if (g != null && g.getGeometryType() == "Polygon") {
 			Polygon p = (Polygon) g;
 			return Arrays.stream(p.getExteriorRing().getCoordinates())
